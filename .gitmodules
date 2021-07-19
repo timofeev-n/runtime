@@ -3,4 +3,4 @@
 	url = git@github.com:libuv/libuv.git
 [submodule "dependencies/rapidjson"]
 	path = dependencies/rapidjson
-	url = https://github.com/Tencent/rapidjson.git
+	url = git@github.com:Tencent/rapidjson.git
