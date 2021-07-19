@@ -1,0 +1,96 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(libruntime
+	LANGUAGES CXX C
+	VERSION 0.0.1
+)
+
+set (RUNTIME_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+set (LIBUV_BUILD_TESTS OFF)
+set (LIBUV_BUILD_BENCH OFF)
+# set (RAPIDJSON_BUILD_DOC OFF)
+# set (RAPIDJSON_BUILD_EXAMPLES OFF)
+# set (RAPIDJSON_BUILD_TESTS OFF)
+# set (RAPIDJSON_BUILD_CXX17 ON)
+# set (RAPIDJSON_BUILD_CXX11 OFF)
+
+maker_initialize(
+	COMMON
+		SUBDIRECTORIES
+			"${CMAKE_CURRENT_SOURCE_DIR}/dependencies/libuv"
+
+	WINDOWS
+		UNITY_DEACTIVATE_ORIGIN     ON
+)
+
+
+maker_create_target(runtime
+	COMMON 
+		BUILD_TYPE	STATIC_LIB
+		UNITY_BUILD OFF
+		IDE_FOLDER "dependencies"
+
+		SRCS
+			"${RUNTIME_SRC_ROOT}"
+		
+		PRIVATE_INCLUDE_DIRS
+			"${RUNTIME_SRC_ROOT}"
+
+		INCLUDE_DIRS
+			"${RUNTIME_SRC_ROOT}/include"
+			"${CMAKE_CURRENT_SOURCE_DIR}/dependencies/rapidjson/include"
+
+		DEFINITIONS
+			RUNTIME_BUILD
+		
+		PUBLIC_DEFINITIONS
+			RAPIDJSON_HAS_CXX17
+
+		PRECOMPILED_HEADER "${RUNTIME_SRC_ROOT}/pch.h"
+
+		LINK_LIBS
+			engine
+			uv_a
+
+	WINDOWS
+		PRECOMPILED_SOURCE "${RUNTIME_SRC_ROOT}/pch.cpp"
+)
+
+
+set (RUNTIME_TESTS_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime_unittests)
+
+maker_create_target(runtime_unittests
+	COMMON 
+		BUILD_TYPE	TEST
+		IDE_FOLDER "Tests"
+
+		SRCS
+			"${RUNTIME_TESTS_SRC_ROOT}"
+
+		PRIVATE_INCLUDE_DIRS
+			"${src}"
+
+		PRECOMPILED_HEADER "${RUNTIME_TESTS_SRC_ROOT}/pch.h"
+
+		LINK_TARGETS
+			runtime
+			gtest
+			gmock
+			gtest_main
+
+	WINDOWS
+		PRECOMPILED_SOURCE "${RUNTIME_TESTS_SRC_ROOT}/pch.cpp"
+
+		OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/win"
+		OUTPUT_NAME_RELEASE "runtime_unittests"
+		OUTPUT_NAME_DEBUG  "runtime_unittests_debug"
+)
+
+
+set_property(
+	TARGET
+		uv
+		uv_a
+	PROPERTY FOLDER "dependencies"
+)
