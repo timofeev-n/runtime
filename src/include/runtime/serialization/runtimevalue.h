@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 #include <runtime/com/ianything.h>
 #include <runtime/com/interface.h>
@@ -30,16 +31,40 @@ struct ABSTRACT_TYPE RuntimeValue : virtual IRefCounted
 };
 
 /**
+
+*/
+struct ABSTRACT_TYPE RuntimeValueRef : virtual RuntimeValue
+{
+	DECLARE_CLASS_BASE(RuntimeValue)
+
+	using Ptr = ComPtr<RuntimeValueRef>;
+
+	static RuntimeValueRef::Ptr Create(RuntimeValue::Ptr&);
+
+	static RuntimeValueRef::Ptr Create(const RuntimeValue::Ptr&);
+
+	virtual void set(RuntimeValue::Ptr) = 0;
+
+	virtual RuntimeValue::Ptr get() const = 0;
+};
+
+
+/**
 */
 struct ABSTRACT_TYPE RuntimePrimitiveValue : virtual RuntimeValue
 {
 	DECLARE_CLASS_BASE(RuntimeValue)
+
+	using Ptr = ComPtr<RuntimePrimitiveValue>;
 };
 
 
 struct ABSTRACT_TYPE RuntimeStringValue : virtual RuntimePrimitiveValue
 {
 	DECLARE_CLASS_BASE(RuntimePrimitiveValue)
+
+	using Ptr = ComPtr<RuntimeStringValue>;
+
 
 	virtual void setUtf8(std::string_view) = 0;
 
@@ -55,6 +80,9 @@ struct ABSTRACT_TYPE RuntimeStringValue : virtual RuntimePrimitiveValue
 struct ABSTRACT_TYPE RuntimeIntegerValue : virtual RuntimePrimitiveValue
 {
 	DECLARE_CLASS_BASE(RuntimePrimitiveValue)
+
+	using Ptr = ComPtr<RuntimeIntegerValue>;
+
 
 	virtual bool isSigned() const = 0;
 
@@ -91,6 +119,9 @@ struct ABSTRACT_TYPE RuntimeFloatValue : virtual RuntimePrimitiveValue
 {
 	DECLARE_CLASS_BASE(RuntimePrimitiveValue)
 
+	using Ptr = ComPtr<RuntimeFloatValue>;
+
+
 	virtual size_t bits() const = 0;
 
 	virtual void setDouble(double) = 0;
@@ -115,6 +146,9 @@ struct ABSTRACT_TYPE RuntimeBooleanValue : virtual RuntimePrimitiveValue
 {
 	DECLARE_CLASS_BASE(RuntimePrimitiveValue)
 
+	using Ptr = ComPtr<RuntimeBooleanValue>;
+
+
 	virtual void set(bool) = 0;
 
 	virtual bool get() const = 0;
@@ -128,15 +162,20 @@ struct ABSTRACT_TYPE RuntimeOptionalValue : virtual RuntimeValue
 {
 	DECLARE_CLASS_BASE(RuntimeValue)
 
+	using Ptr = ComPtr<RuntimeOptionalValue>;
+
 	virtual bool hasValue() const = 0;
 
 	virtual RuntimeValue::Ptr value() const = 0;
 
 	virtual Result<> setValue(RuntimeValue::Ptr value = nothing) = 0;
 
-	explicit inline operator bool () const
-	{
+	explicit inline operator bool () const {
 		return this->hasValue();
+	}
+
+	inline void reset() {
+		this->setValue(nothing).rethrowIfException();
 	}
 };
 
@@ -145,6 +184,9 @@ struct ABSTRACT_TYPE RuntimeOptionalValue : virtual RuntimeValue
 struct ABSTRACT_TYPE RuntimeReadonlyCollection : virtual RuntimeValue
 {
 	DECLARE_CLASS_BASE(RuntimeValue)
+
+	using Ptr = ComPtr<RuntimeReadonlyCollection>;
+
 
 	virtual size_t size() const = 0;
 
@@ -163,6 +205,9 @@ struct ABSTRACT_TYPE RuntimeArray : virtual RuntimeReadonlyCollection
 {
 	DECLARE_CLASS_BASE(RuntimeReadonlyCollection)
 
+	using Ptr = ComPtr<RuntimeArray>;
+
+
 	virtual void clear() = 0;
 
 	virtual void reserve(size_t) = 0;
@@ -176,6 +221,8 @@ struct ABSTRACT_TYPE RuntimeArray : virtual RuntimeReadonlyCollection
 struct ABSTRACT_TYPE RuntimeTuple : virtual RuntimeReadonlyCollection
 {
 	DECLARE_CLASS_BASE(RuntimeReadonlyCollection)
+
+	using Ptr = ComPtr<RuntimeTuple>;
 };
 
 
@@ -184,6 +231,8 @@ struct ABSTRACT_TYPE RuntimeTuple : virtual RuntimeReadonlyCollection
 struct ABSTRACT_TYPE RuntimeReadonlyDictionary : virtual RuntimeValue
 {
 	DECLARE_CLASS_BASE(RuntimeValue)
+	
+	using Ptr = ComPtr<RuntimeReadonlyDictionary>;
 
 
 	virtual size_t size() const = 0;
@@ -215,6 +264,8 @@ struct ABSTRACT_TYPE RuntimeDictionary : virtual RuntimeReadonlyDictionary
 {
 	DECLARE_CLASS_BASE(RuntimeReadonlyDictionary)
 
+	using Ptr = ComPtr<RuntimeDictionary>;
+
 
 	virtual void clear() = 0;
 
@@ -231,6 +282,9 @@ struct ABSTRACT_TYPE RuntimeObject : virtual RuntimeReadonlyDictionary
 {
 	DECLARE_CLASS_BASE(RuntimeReadonlyDictionary)
 
+	using Ptr = ComPtr<RuntimeObject>;
+
+
 	struct FieldInfo
 	{
 
@@ -240,7 +294,5 @@ struct ABSTRACT_TYPE RuntimeObject : virtual RuntimeReadonlyDictionary
 
 	virtual boost::optional<FieldInfo> fieldInfo(std::string_view) const  = 0;
 };
-
-
 
 }

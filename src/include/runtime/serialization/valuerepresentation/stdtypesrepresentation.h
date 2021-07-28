@@ -1,4 +1,6 @@
 #pragma once
+#define REPRESENT_STD_OPTIONAL
+#define REPRESENT_BOOST_OPTIONAL
 
 #include "arrayrepresentation.h"
 #include "optionalrepresentation.h"
@@ -10,8 +12,21 @@
 #include <array>
 #include <list>
 #include <map>
-// #include <optional>
+
+#ifdef REPRESENT_STD_OPTIONAL
+#include <optional>
+#endif
+
+#ifdef REPRESENT_BOOST_OPTIONAL
+
+#if __has_include(<boost/optional.hpp>)
 #include <boost/optional.hpp>
+#else
+#undef REPRESENT_BOOST_OPTIONAL
+#endif
+
+#endif
+
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -189,6 +204,8 @@ struct TupleValueOperations<std::pair<First, Second>>
 };
 
 
+#ifdef REPRESENT_BOOST_OPTIONAL
+
 /**
 */
 template<typename T>
@@ -204,7 +221,7 @@ struct OptionalValueOperations<boost::optional<T>>
 	}
 
 	static const ValueType& value(const Optional& opt) {
-		Assert2(opt, "Optional has no value")
+		Assert2(opt, "Optional has no value");
 		return *opt;
 	}
 
@@ -223,6 +240,49 @@ struct OptionalValueOperations<boost::optional<T>>
 		return opt.value();
 	}
 };
+
+#undef REPRESENT_BOOST_OPTIONAL
+#endif
+
+
+#ifdef REPRESENT_STD_OPTIONAL
+
+/**
+*/
+template<typename T>
+struct OptionalValueOperations<std::optional<T>>
+{
+	using ValueType = T;
+	using Optional = std::optional<T>;
+
+
+	static bool hasValue(const Optional& opt) {
+		return opt.has_value();
+	}
+
+	static const ValueType& value(const Optional& opt) {
+		Assert2(opt, "Optional has no value");
+		return *opt;
+	}
+
+	static ValueType& value(Optional& opt) {
+		Assert2(opt, "Optional has no value");
+		return *opt;
+	}
+
+	static void reset(Optional& opt) {
+		opt.reset();
+	}
+
+	template<typename ... Values>
+	static ValueType& emplace(Optional& opt, Values&& ... values) {
+		return opt.emplace(std::forward<Values>(values)...);
+	}
+};
+#undef REPRESENT_STD_OPTIONAL
+#endif
+
+
 
 template<typename Key_, typename Value_, typename ... Traits>
 struct DictionaryValueOperations<std::map<Key_, Value_, Traits ... >>
@@ -306,3 +366,5 @@ struct DictionaryValueOperations<std::map<Key_, Value_, Traits ... >>
 };
 
 }
+
+

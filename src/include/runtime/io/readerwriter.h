@@ -9,6 +9,7 @@
 
 #include <string>
 
+namespace Runtime::Io {
 /**
 * 
 */
@@ -101,3 +102,5 @@ private:
 	std::string_view m_str;
 	size_t m_offset = 0;
 };
+
+} // namespace Runtime::Io

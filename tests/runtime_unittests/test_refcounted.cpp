@@ -2,7 +2,6 @@
 #include <runtime/com/refcounted.h>
 
 
-
 using namespace Runtime;
 using namespace testing;
 
@@ -12,37 +11,30 @@ template<typename RC>
 class Test_RefCounted : public testing::Test
 {
 public:
-	RC m_counter;
+	RC _counter;
 };
 
 
-#if 0
 using RCTypes = testing::Types<ConcurrentRC, SingleThreadRC, StrictSingleThreadRC>;
-TYPED_TEST_SUITE(Test_RefCounted, RCTypes);
-
-
+TYPED_TEST_CASE(Test_RefCounted, RCTypes);
 
 TYPED_TEST(Test_RefCounted, InitiallyHasOneRef)
 {
-	ASSERT_THAT(refsCount(this->m_counter), Eq(1));
+	ASSERT_THAT(refsCount(this->_counter), Eq(1));
 }
-
 
 TYPED_TEST(Test_RefCounted, AddRef)
 {
-	ASSERT_THAT(this->m_counter.addRef(), Eq(1));
-	ASSERT_THAT(this->m_counter.addRef(), Eq(2));
+	ASSERT_THAT(this->_counter.addRef(), Eq(1));
+	ASSERT_THAT(this->_counter.addRef(), Eq(2));
 }
-
 
 TYPED_TEST(Test_RefCounted, RemoveRef)
 {
-	ASSERT_THAT(this->m_counter.addRef(), Eq(1));
-	ASSERT_THAT(this->m_counter.removeRef(), Eq(2));
-	ASSERT_THAT(this->m_counter.removeRef(), Eq(1));
+	ASSERT_THAT(this->_counter.addRef(), Eq(1));
+	ASSERT_THAT(this->_counter.removeRef(), Eq(2));
+	ASSERT_THAT(this->_counter.removeRef(), Eq(1));
 }
-
-#endif
 
 TEST(Test_ConcurrentRC, Multithread)
 {

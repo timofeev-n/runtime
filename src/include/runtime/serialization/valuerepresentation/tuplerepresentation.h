@@ -21,7 +21,7 @@ std::false_type TupleRepresentableHelper(...);
 } // namespace Detail
 
 template<typename T>
-inline constexpr bool IsTupleRepresentable = decltype(Detail::TupleRepresentableHelper<T>(int{}))::value;
+inline constexpr bool IsTupleRepresentable = decltype(Detail::TupleRepresentableHelper<std::decay_t<T>>(int{}))::value;
 
 
 //template<typename T>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <runtime/utils/typelist/typelist.h>
 #include <EngineAssert.h>
 
 #include <type_traits>
@@ -7,13 +8,28 @@
 #include <utility>
 
 namespace Runtime {
+namespace Detail {
+
+template<typename>
+struct TupleFrom;
+
+template<typename ... T>
+struct TupleFrom<TypeList<T...>>
+{
+	using type = std::tuple<T...>;
+};
+
+}
 
 
 struct Tuple
 {
-
 	template<typename T>
 	using Indexes = std::make_index_sequence<std::tuple_size_v<std::decay_t<T>>>;
+
+	template<typename T>
+	using TupleFrom = typename Detail::TupleFrom<T>::type;
+
 
 	template<typename T>
 	static constexpr auto indexes(const T&) {

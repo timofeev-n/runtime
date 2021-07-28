@@ -1,3 +1,5 @@
+//◦ Playrix ◦
+
 #pragma once
 #include <SDKDDKVer.h>
 

@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 #include <runtime/async/task.h>
 #include <runtime/com/ianything.h>

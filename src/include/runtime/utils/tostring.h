@@ -1,6 +1,8 @@
 #pragma once
 #include <runtime/serialization/valuerepresentation/stringrepresentable.h>
 #include <runtime/utils/typeutility.h>
+#include <runtime/utils/result.h>
+
 #include <string>
 #include <string_view>
 
@@ -13,16 +15,20 @@ decltype(ToString(ConstLValueRef<T>())) ToStringResultHelper(int);
 template<typename>
 std::false_type ToStringResultHelper(...);
 
-//template<typename T>
-//decltype(Parse(std::string_view{})) ParseResultHelper();
+template<typename T>
+decltype(Parse(LValueRef<T>(), std::string_view{})) ParseResultHelper();
 
-//template<typename>
-//std::false_type ParseResultHelper(...);
+template<typename>
+std::false_type ParseResultHelper(...);
 
 } // namespace Detail
 
-template<typename T>
-inline constexpr bool ToStringIsApplicable = IsStringRepresentable<decltype(Detail::ToStringResultHelper<T>(int{}))>;
+//template<typename T>
+//inline constexpr bool ToStringIsApplicable = IsStringRepresentable<decltype(Detail::ToStringResultHelper<T>(int{}))>;
+//
+//template<typename T>
+//inline constexpr bool ParseIsApplicable = 
+//	std::is
 
 //template<typename T>
 //inline constexpr bool ParseIsApplicable = std::is_assignable_v<T&, decltype(Detail::ParseResultHelper<T>(std::string_view{}))>;
@@ -32,9 +38,17 @@ inline std::string ToString(std::string_view str) {
 	return std::string{str};
 }
 
-//inline std::string Parse(std::string_view str) {
-//	return std::string{str};
-//}
+template<typename ... Traits>
+inline std::basic_string<char, Traits...>& ToString(std::basic_string<char, Traits...>& str) {
+	return (str);
+}
+
+template<typename ... Traits>
+inline Result<> Parse(std::basic_string<char, Traits...>& target, std::string_view str) {
+	target = str;
+	return success;
+}
+
 
 //template<typename T>
 //concept StringRepresentable = requires(const T &value) {

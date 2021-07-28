@@ -1,6 +1,9 @@
+//◦ Playrix ◦
 #include "pch.h"
 #include "runtime/serialization/runtimevalue.h"
 #include "runtime/diagnostics/exception.h"
+#include "runtime/com/comclass.h"
+
 //#include "runtime/utils/stringconv.h"
 // #include "runtime/com/comclass.h"
 
@@ -66,8 +69,54 @@ Result<> visitNumericPrimitiveValue(RT& value, F f)
 }
 */
 
-Result<> assignPrimitiveValue(RuntimePrimitiveValue& dst, const RuntimePrimitiveValue& src)
+class RuntimeValueRefImpl final : public RuntimeValueRef
 {
+	COMCLASS_(RuntimeValueRef);
+
+public:
+
+	RuntimeValueRefImpl(RuntimeValue::Ptr& valueRef): _valueRef(valueRef), _isMutable(true)
+	{}
+
+	RuntimeValueRefImpl(const RuntimeValue::Ptr& valueRef): _valueRef(const_cast<RuntimeValue::Ptr&>(valueRef)), _isMutable(false)
+	{}
+
+	bool isMutable() const {
+		return _isMutable;
+	}
+
+	void set(RuntimeValue::Ptr value) override {
+		_valueRef = std::move(value);
+	}
+
+	RuntimeValue::Ptr get() const override {
+		return _valueRef;
+	}
+
+private:
+	RuntimeValue::Ptr& _valueRef;
+	const bool _isMutable;
+};
+
+/* -------------------------------------------------------------------------- */
+
+Result<> assignStringValue(RuntimeStringValue& dstStr, const RuntimePrimitiveValue& src) {
+
+	if (const RuntimeStringValue* const srcStr = src.as<const RuntimeStringValue*>()) {
+		auto strBytes = srcStr->getUtf8();
+		dstStr.setUtf8(strBytes);
+		return success;
+	}
+
+	return Excpt_("String value can be assigned only from other string");
+}
+
+Result<> assignPrimitiveValue(RuntimePrimitiveValue& dst, const RuntimePrimitiveValue& src) {
+	
+	if (RuntimeStringValue* const dstStr = dst.as<RuntimeStringValue*>()) {
+		return assignStringValue(*dstStr, src);
+	}
+
 	if (RuntimeBooleanValue* const dstBool = dst.as<RuntimeBooleanValue*>(); dstBool)
 	{
 		if (auto srcBool = src.as<const RuntimeBooleanValue*>(); srcBool)
@@ -144,6 +193,7 @@ Result<> assignPrimitiveValue(RuntimePrimitiveValue& dst, const RuntimePrimitive
 	}
 
 
+	return Excpt_("Do not known how to assing primitive runtime value");
 
 	//const auto isString = [](const RuntimePrimitiveValue& val) 
 	//{
@@ -227,7 +277,7 @@ Result<> assignObject(RuntimeObject& obj, const RuntimeReadonlyDictionary& dict)
 	{
 		const auto [key, fieldValue] = obj[i];
 
-		if (const RuntimeValue::Ptr value = dict[key]; value)
+		if (const RuntimeValue::Ptr value = dict.value(key); value)
 		{
 			if (auto assignResult = RuntimeValue::assign(fieldValue, value); !assignResult)
 			{
@@ -249,33 +299,31 @@ Result<> assignObject(RuntimeObject& obj, const RuntimeReadonlyDictionary& dict)
 Result<> RuntimeValue::assign(RuntimeValue::Ptr dst, RuntimeValue::Ptr src)
 {
 	Assert(dst);
-	Assert(src);
 	Assert(dst->isMutable());
 
-	if (src->is<RuntimeOptionalValue>()) 
-	{
-		auto& srcOpt = src->as<const RuntimeOptionalValue&>();
-		if (srcOpt.hasValue()) 
-		{
-			//return RuntimeValue::assign(dst, srcOpt.value());
-		}
-		
-		if (!dst->is<RuntimeOptionalValue>()) 
-		{
-			return Excpt_("Optional is null");
-		}
-		else 
-		{
-			auto& dstOpt = dst->as<RuntimeOptionalValue&>();
-			return dstOpt.setValue();
-		}
+	if (RuntimeValueRef* const valueRef = dst->as<RuntimeValueRef*>()) {
+		valueRef->set(std::move(src));
+		return success;
 	}
 
-	if (dst->is<RuntimeOptionalValue>()) 
-	{
-		auto& dstOpt = dst->as<RuntimeOptionalValue&>();
-		// Can this code be refactored to takes into account, that next line can be failed ?!
-		//return RuntimeValue::assign(dstOpt.emplace(), src);
+	Assert(src);
+
+	if (const RuntimeOptionalValue* const srcOpt = src->as<const RuntimeOptionalValue*>(); srcOpt) {
+
+		if (srcOpt->hasValue()) {
+			return RuntimeValue::assign(dst, srcOpt->value());
+		}
+
+		if (RuntimeOptionalValue* const dstOpt = dst->as<RuntimeOptionalValue*>()) {
+			dstOpt->reset();
+			return success;
+		}
+		
+		return Excpt_("Attempt to assgin non optional value from null (optional)");
+	}
+
+	if (RuntimeOptionalValue* const dstOpt = dst->as<RuntimeOptionalValue*>()) {
+		return dstOpt->setValue(std::move(src));
 	}
 
 	if (RuntimePrimitiveValue* const dstValue = dst->as<RuntimePrimitiveValue*>(); dstValue)
@@ -312,6 +360,15 @@ Result<> RuntimeValue::assign(RuntimeValue::Ptr dst, RuntimeValue::Ptr src)
 	}
 
 	return Excpt_("Do not known how to assign runtime value");
+}
+
+/* -------------------------------------------------------------------------- */
+RuntimeValueRef::Ptr RuntimeValueRef::Create(RuntimeValue::Ptr& value) {
+	return Com::createInstance<RuntimeValueRefImpl, RuntimeValueRef>(std::ref(value));
+}
+
+RuntimeValueRef::Ptr RuntimeValueRef::Create(const RuntimeValue::Ptr& value) {
+	return Com::createInstance<RuntimeValueRefImpl, RuntimeValueRef>(std::cref(value));
 }
 
 }

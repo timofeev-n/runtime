@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 #include <boost/optional.hpp>
 #include <string_view>

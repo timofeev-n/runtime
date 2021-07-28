@@ -43,7 +43,7 @@ std::false_type ArrayRepresentableHelper(...);
 }
 
 template<typename T>
-inline constexpr bool IsArrayRepresentable = decltype(Detail::ArrayRepresentableHelper<T>(int{}))::value;
+inline constexpr bool IsArrayRepresentable = decltype(Detail::ArrayRepresentableHelper<std::decay_t<T>>(int{}))::value;
 
 
 

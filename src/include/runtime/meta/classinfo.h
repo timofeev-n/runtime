@@ -233,7 +233,7 @@ struct ClassAllBase__<T, TypeList<Bases...>> {
 
 
 template<typename T>
-auto classFields__(T* instance) {
+auto GetClassFields(T* instance) {
 	
 	using Type = std::remove_cv_t<T>;
 
@@ -246,16 +246,27 @@ auto classFields__(T* instance) {
 	}
 }
 
-template<typename T, typename = typename ClassDirectBase__<std::remove_const_t<T>>::type>
-struct ClassAndBaseFields__;
+template<bool IsConst, typename T, typename = typename ClassDirectBase__<std::remove_const_t<T>>::type>
+struct ClassAndBaseFields;
 
 template<typename T, typename ... Base>
-struct ClassAndBaseFields__<T, TypeList<Base...>>
+struct ClassAndBaseFields<false, T, TypeList<Base...>>
 {
-	static auto fields(T* instance) {
+	static auto GetFields(T* instance) {
 		return std::tuple_cat(
-			ClassAndBaseFields__<Base>::fields(static_cast<Base*>(instance)) ... ,
-			classFields__(instance)
+			ClassAndBaseFields<false, Base>::GetFields(static_cast<Base*>(instance)) ... ,
+			GetClassFields(instance)
+		);
+	}
+};
+
+template<typename T, typename ... Base>
+struct ClassAndBaseFields<true, T, TypeList<Base...>>
+{
+	static auto GetFields(const T* instance) {
+		return std::tuple_cat(
+			ClassAndBaseFields<true, Base>::GetFields(static_cast<const Base*>(instance)) ... ,
+			GetClassFields(instance)
 		);
 	}
 };
@@ -310,15 +321,22 @@ template<typename T>
 using ClassAllUniqueBase = typelist::Distinct<ClassAllBase<T>>;
 
 template<typename T>
-[[nodiscard]] auto classFields(T& instance)  // T maybe const T
+[[nodiscard]] auto classFields(T& instance)
 {
-	return Runtime::MetaDetail::ClassAndBaseFields__<T>::fields(&instance);
+	return Runtime::MetaDetail::ClassAndBaseFields<false, T>::GetFields(&instance);
+}
+
+template<typename T>
+[[nodiscard]] auto classFields(const T& instance)
+{
+	return Runtime::MetaDetail::ClassAndBaseFields<true, T>::GetFields(&instance);
 }
 
 template<typename T>
 [[nodiscard]] auto classFields()
 {
-	return Runtime::MetaDetail::ClassAndBaseFields__<T>::fields(nullptr);
+	const T* noInstance = nullptr;
+	return Runtime::MetaDetail::ClassAndBaseFields<true, T>::GetFields(noInstance);
 }
 
 template<typename T>

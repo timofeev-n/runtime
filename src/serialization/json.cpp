@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #include "pch.h"
 #if ! __has_include(<rapidjson/stringbuffer.h>)
 #error rapid json dependency not used for current project
@@ -9,6 +10,7 @@
 #include "runtime/com/comclass.h"
 #include "runtime/utils/scopeguard.h"
 #include "runtime/utils/intrusivelist.h"
+#include "runtime/io/readerwriter.h"
 
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>
@@ -228,7 +230,7 @@ private:
 };
 
 
-RuntimeValue::Ptr createRuntimeValueFromJson(ValueOrDocument value);
+RuntimeValue::Ptr CreateRuntimeValueFromJson(ValueOrDocument value);
 
 
 class JsonRuntimeValueBase : public virtual RuntimePrimitiveValue
@@ -270,32 +272,24 @@ public:
 
 	using JsonRuntimeValueBase::JsonRuntimeValueBase;
 
-	bool isSigned() const override
-	{
+	bool isSigned() const override {
 		return this->jsonValue().IsInt() || this->jsonValue().IsInt64();
 	}
 
-	size_t bits() const
-	{
+	size_t bits() const {
 		return this->jsonValue().IsInt64() || this->jsonValue().IsUint64() ? sizeof(int64_t) : sizeof(int32_t);
 	}
 
-
-	void setInt64(int64_t) override
-	{
+	void setInt64(int64_t) override {
 	}
 
-	void setUint64(uint64_t) override
-	{
+	void setUint64(uint64_t) override {
 	}
 
-	int64_t getInt64() const override
-	{
+	int64_t getInt64() const override {
 		return this->getWithRangeCheck<int64_t>();
 	}
-
-	uint64_t getUint64() const override
-	{
+	uint64_t getUint64() const override {
 		return this->getWithRangeCheck<uint64_t>();
 	}
 
@@ -337,7 +331,25 @@ private:
 };
 
 
-class JsonRuntimeFloatValue : public virtual JsonRuntimeValueBase, public RuntimeFloatValue
+class JsonRuntimeBooleanValue final : public virtual JsonRuntimeValueBase, public virtual RuntimeBooleanValue
+{
+	COMCLASS_(JsonRuntimeValueBase, RuntimeBooleanValue)
+
+public:
+
+	using JsonRuntimeValueBase::JsonRuntimeValueBase;
+
+	void set(bool) override {
+	}
+
+	bool get() const override {
+		Assert(this->jsonValue().GetType() == rapidjson::kTrueType || this->jsonValue().GetType() == rapidjson::kFalseType);
+		return this->jsonValue().GetType() == rapidjson::kTrueType;
+	}
+};
+
+
+class JsonRuntimeFloatValue final : public virtual JsonRuntimeValueBase, public RuntimeFloatValue
 {
 	COMCLASS_(JsonRuntimeValueBase, RuntimeFloatValue)
 
@@ -345,37 +357,60 @@ public:
 
 	using JsonRuntimeValueBase::JsonRuntimeValueBase;
 
-	size_t bits() const override
-	{
+	size_t bits() const override {
 		return this->jsonValue().IsDouble() ? sizeof(double) : sizeof(float);
 	}
 
-	void setDouble(double) override
-	{
+	void setDouble(double) override {
 	}
 
-	void setSingle(float) override
-	{
-
+	void setSingle(float) override {
 	}
 
-	double getDouble() const override
-	{
-		if (this->jsonValue().IsDouble())
-		{
+	double getDouble() const override {
+
+		if (this->jsonValue().IsDouble()) {
 			return this->jsonValue().GetDouble();
 		}
 
 		Assert(this->jsonValue().IsFloat());
-
 		return static_cast<double>(this->jsonValue().GetFloat());
 	}
 	
-	float getSingle() const override
-	{
+	float getSingle() const override {
 		return this->jsonValue().GetFloat();
 	}
 };
+
+
+class JsonRuntimeStringValue final: public virtual JsonRuntimeValueBase, public RuntimeStringValue
+{
+	COMCLASS_(JsonRuntimeValueBase, RuntimeStringValue)
+
+public:
+
+	using JsonRuntimeValueBase::JsonRuntimeValueBase;
+
+
+	void setUtf8(std::string_view) override {
+
+	}
+
+	void set(std::wstring) override {
+	}
+
+	std::wstring get() const override {
+		Halt("JSON string UTF-8 -> std::wstring conversion not implemented");
+		return {};
+	}
+
+	std::string getUtf8() const override {
+		const char* const ptr = this->jsonValue().GetString();
+		const size_t len = static_cast<size_t>(this->jsonValue().GetStringLength());
+		return {ptr, len};
+	}
+};
+
 
 
 class JsonRuntimeArray final : public JsonRuntimeValueBase, public virtual RuntimeReadonlyCollection, public virtual RuntimeTuple
@@ -407,7 +442,7 @@ public:
 		if (!m_elements[index])
 		{
 			JsonValue& el = m_jsonArray[static_cast<rapidjson::SizeType>(index)];
-			m_elements[index] = createRuntimeValueFromJson(std::move(el));
+			m_elements[index] = CreateRuntimeValueFromJson(std::move(el));
 		}
 
 		return m_elements[index];
@@ -443,7 +478,7 @@ class JsonRuntimeDictionary final : public JsonRuntimeValueBase, public virtual 
 	COMCLASS_(JsonRuntimeValueBase, RuntimeReadonlyDictionary)
 
 public:
-	JsonRuntimeDictionary(ValueOrDocument value): JsonRuntimeValueBase(std::move(value)) {
+	JsonRuntimeDictionary(ValueOrDocument jsonValue): JsonRuntimeValueBase(std::move(jsonValue)) {
 		Assert(this->jsonValue().IsObject());
 
 		JsonValue::Object obj = this->jsonValue().GetObj();
@@ -451,7 +486,7 @@ public:
 		for (auto& member : obj)
 		{
 			std::string_view memberName = member.name.GetString();
-			auto value = createRuntimeValueFromJson(std::move(member.value));
+			auto value = CreateRuntimeValueFromJson(std::move(member.value));
 
 			m_members.emplace(std::move(memberName), std::move(value));
 			// member.value
@@ -490,17 +525,18 @@ public:
 
 private:
 
-	std::map<std::string_view, ComPtr<JsonRuntimeValueBase>, std::less<>> m_members;
+	//std::map<std::string_view, ComPtr<JsonRuntimeValueBase>, std::less<>> m_members;
+	std::map<std::string, ComPtr<JsonRuntimeValueBase>, std::less<>> m_members;
 
 };
 
 //-----------------------------------------------------------------------------
-RuntimeValue::Ptr createRuntimeValueFromJson(ValueOrDocument value)
-{
-	if (value->GetType() == rapidjson::kNumberType)
-	{
-		if (value->IsFloat() || value->IsDouble())
-		{
+RuntimeValue::Ptr CreateRuntimeValueFromJson(ValueOrDocument value) {
+	const rapidjson::Type valueType = value->GetType();
+
+	if (valueType == rapidjson::kNumberType) {
+
+		if (value->IsFloat() || value->IsDouble()) {
 			return Com::createInstance<JsonRuntimeFloatValue>(std::move(value));
 		}
 
@@ -509,18 +545,25 @@ RuntimeValue::Ptr createRuntimeValueFromJson(ValueOrDocument value)
 		return Com::createInstance<JsonRuntimeIntegerValue, RuntimeValue>(std::move(value));
 	}
 
-	if (value->GetType() == rapidjson::kArrayType)
-	{
+	if (valueType == rapidjson::kTrueType || valueType ==  rapidjson::kFalseType) {
+		return Com::createInstance<JsonRuntimeBooleanValue, RuntimeValue>(std::move(value));
+	}
+
+	if (valueType == rapidjson::kStringType) {
+		return Com::createInstance<JsonRuntimeStringValue, RuntimeValue>(std::move(value));
+	}
+
+	if (valueType == rapidjson::kArrayType) {
 		return Com::createInstance<JsonRuntimeArray>(std::move(value));
 	}
 
-	if (value->GetType() == rapidjson::kObjectType)
-	{
+	if (valueType == rapidjson::kObjectType) {
 		return Com::createInstance<JsonRuntimeDictionary>(std::move(value));
 	}
 
-	return {};
+	Halt(Core::Format::format("Unhandled Json value type while creating runtime value"));
 
+	return {};
 }
 
 
@@ -549,6 +592,16 @@ void writeJsonPrimitiveValue(rapidjson::Writer<Stream, SrcEnc, TargetEnc>& write
 			writer.Double(floatPoint->getDouble());
 		}
 	}
+	else if (auto str = value.as<const RuntimeStringValue*>(); str) {
+		auto text = str->getUtf8();
+		writer.String(text.c_str(), static_cast<rapidjson::SizeType>(text.length()), true);
+	}
+	else if (auto boolValue = value.as<const RuntimeBooleanValue*>(); boolValue) {
+		writer.Bool(boolValue->get());
+	}
+	else {
+		Halt("Unknown primitive type for json serialization");
+	}
 }
 
 
@@ -558,13 +611,30 @@ void writeJsonPrimitiveValue(rapidjson::Writer<Stream, SrcEnc, TargetEnc>& write
 template<typename Stream, typename SrcEnc, typename TargetEnc>
 Result<> writeJsonValue(rapidjson::Writer<Stream, SrcEnc, TargetEnc>& writer, const RuntimeValue::Ptr& value)
 {
+	if (const RuntimeOptionalValue* optionalValue = value->as<const RuntimeOptionalValue*>()) {
+		if (optionalValue->hasValue()) {
+			return writeJsonValue(writer, optionalValue->value());
+		}
+
+		writer.Null();
+		return success;
+	}
+
+	if (const RuntimeValueRef* refValue = value->as<const RuntimeValueRef*>()) {
+		const auto referencedValue = refValue->get();
+		if (referencedValue) {
+			return writeJsonValue(writer, referencedValue);
+		}
+
+		writer.Null();
+		return success;
+	}
+
 	
-	if (const RuntimePrimitiveValue* primitiveValue = value->as<const RuntimePrimitiveValue*>(); primitiveValue)
-	{
+	if (const RuntimePrimitiveValue* primitiveValue = value->as<const RuntimePrimitiveValue*>(); primitiveValue) {
 		writeJsonPrimitiveValue(writer, *primitiveValue);
 	}
-	else if (value->is<RuntimeReadonlyCollection>())
-	{
+	else if (value->is<RuntimeReadonlyCollection>()) {
 		writer.StartArray();
 
 		SCOPE_Success{
@@ -581,8 +651,7 @@ Result<> writeJsonValue(rapidjson::Writer<Stream, SrcEnc, TargetEnc>& writer, co
 			}
 		}
 	}
-	else if (value->is<RuntimeReadonlyDictionary>())
-	{
+	else if (value->is<RuntimeReadonlyDictionary>()) {
 		writer.StartObject();
 
 		SCOPE_Success{
@@ -609,7 +678,7 @@ Result<> writeJsonValue(rapidjson::Writer<Stream, SrcEnc, TargetEnc>& writer, co
 } // namespace
 
 
-Result<> jsonWrite(Io::Writer& charWriter, const RuntimeValue::Ptr& value, JsonSettings settings)
+Result<> JsonWrite(Io::Writer& charWriter, const RuntimeValue::Ptr& value, JsonSettings settings)
 {
 	WriterStream<> stream(charWriter);
 
@@ -618,7 +687,7 @@ Result<> jsonWrite(Io::Writer& charWriter, const RuntimeValue::Ptr& value, JsonS
 	return writeJsonValue(jsonWriter, value);
 }
 
-Result<RuntimeValue::Ptr> jsonParse(Io::Reader& reader)
+Result<RuntimeValue::Ptr> JsonParse(Io::Reader& reader)
 {
 	JsonDocument document;
 	ReaderStream stream{reader};
@@ -628,7 +697,7 @@ Result<RuntimeValue::Ptr> jsonParse(Io::Reader& reader)
 		return result.err();
 	}
 
-	return createRuntimeValueFromJson(std::move(document));
+	return CreateRuntimeValueFromJson(std::move(document));
 
 	// return RuntimeValue::Ptr{};
 }
@@ -637,6 +706,15 @@ Result<RuntimeValue::Ptr> jsonParse(Io::Reader& reader)
 //{
 //	return success;
 //}
+
+Result<RuntimeValue::Ptr> JsonParseString(std::string_view str) {
+	if (str.empty()) {
+		return Excpt_("Empty string");
+	}
+
+	Io::StringReader reader{str};
+	return JsonParse(reader);
+}
 
 } // namespace Runtime::Serialization
 

@@ -43,8 +43,8 @@ TEST(Test_ValueRepresentation, CheckIsString)
 {
 	using namespace Runtime;
 
-	static_assert(ToStringIsApplicable<std::string>);
-	static_assert(ToStringIsApplicable<std::string_view>);
+	// static_assert(ToStringIsApplicable<std::string>);
+	// static_assert(ToStringIsApplicable<std::string_view>);
 }
 
 
@@ -62,6 +62,10 @@ TEST(Test_ValueRepresentation, CheckIsArray)
 	static_assert(IsArrayRepresentable<std::vector<std::string>>);
 	static_assert(IsArrayRepresentable<std::list<std::string>>);
 	static_assert(IsArrayRepresentable<std::array<std::string,10>>);
+
+	static_assert(IsArrayRepresentable<const std::vector<std::string>>);
+	static_assert(IsArrayRepresentable<const std::list<std::string>>);
+	static_assert(IsArrayRepresentable<const std::array<std::string,10>>);
 }
 
 TEST(Test_ValueRepresentation, CheckIsTuple)
@@ -70,6 +74,9 @@ TEST(Test_ValueRepresentation, CheckIsTuple)
 
 	static_assert(IsTupleRepresentable<std::tuple<>>);
 	static_assert(IsTupleRepresentable<std::tuple<float, int, std::string>>);
+
+	static_assert(IsTupleRepresentable<const std::tuple<>>);
+	static_assert(IsTupleRepresentable<const std::tuple<float, int, std::string>>);
 }
 
 TEST(Test_ValueRepresentation, CheckIsDictionary)
