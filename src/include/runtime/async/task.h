@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 
 #include <runtime/async/taskbasetypes.h>
@@ -270,9 +271,10 @@ inline Task<bool> whenAny(std::initializer_list<Task<T>> tasks, std::optional<st
 }
 
 
-template<typename F, typename ... Args>
+template<typename F, typename ... Args,
+	std::enable_if_t<IsTask<std::invoke_result_t<F, Args...>>, int> = 0>
 // requires (IsTask<std::invoke_result_t<F, Args...>>)
-auto run(F operation, Scheduler::Ptr scheduler, Args ... args) -> std::invoke_result_t<F, Args...>
+std::invoke_result_t<F, Args...> run(F operation, Scheduler::Ptr scheduler, Args ... args)
 {
 	static_assert(IsTask<std::invoke_result_t<F, Args...>>);
 
@@ -301,6 +303,45 @@ auto run(F operation, Scheduler::Ptr scheduler, Args ... args) -> std::invoke_re
 
 	co_return (co_await task);
 }
+
+
+template<typename F, typename ... Args,
+	std::enable_if_t<!IsTask<std::invoke_result_t<F, Args...>>, int> = 0>
+// requires (IsTask<std::invoke_result_t<F, Args...>>)
+Task<std::invoke_result_t<F, Args...>> run(F operation, Scheduler::Ptr scheduler, Args ... args)
+{
+	using Result = std::invoke_result_t<F, Args...>;
+
+	static_assert(std::is_invocable_v<F, Args...>, "Invalid functor. Arguments does not match expected parameters.");
+
+	if (!scheduler)
+	{
+		scheduler = Scheduler::getDefault();
+	}
+
+	if (scheduler.get() != Scheduler::getCurrent().get())
+	{
+		co_await scheduler;
+	}
+
+	using TaskType = std::invoke_result_t<F, Args...>;
+
+	// Scheduler::InvocationGuard invoke {*scheduler}; must be applied above,
+	// because currently we are inside of schduler's invocation.
+
+	if constexpr (!std::is_same_v<Result, void>) {
+		co_return operation(std::move(args)...);
+	}
+	else {
+		operation(std::move(args)...);
+	}
+
+	//{
+	//	Scheduler::InvocationGuard invoke {*scheduler};
+	//	task = operation(std::move(args)...);
+	//}
+}
+
 
 
 } // namespace Async

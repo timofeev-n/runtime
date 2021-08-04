@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 #include <runtime/com/ianything.h>
 #include <runtime/meta/classinfo.h>

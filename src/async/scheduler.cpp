@@ -15,33 +15,43 @@ namespace {
 /**
 * 
 */
-Scheduler* currentThreadInvokedScheduler(std::optional<Scheduler*> scheduler = std::nullopt) noexcept
+Scheduler* currentThreadInvokedScheduler(std::optional<Scheduler::InvocationGuard*> newCurrentGuard = std::nullopt) noexcept
 {
-	static thread_local Scheduler* invokedScheduler__ = nullptr;
+	// static thread_local Scheduler* invokedScheduler__ = nullptr;
+	static thread_local Scheduler::InvocationGuard* guard = nullptr;
 
-	if (scheduler)
+	if (newCurrentGuard)
 	{
-		Scheduler* const temp = invokedScheduler__;
+		if (*newCurrentGuard != nullptr) {
+			(*newCurrentGuard)->prev = guard;
+			guard = *newCurrentGuard;
+		}
+		else {
+			Assert(guard);
+			guard = guard->prev;
+		}
+
+		/*Scheduler* const temp = invokedScheduler__;
 		invokedScheduler__ = *scheduler;
-		return temp;
+		return temp;*/
 	}
 
-	return invokedScheduler__;
+	return guard ? &guard->scheduler : nullptr;
 }
 
 
 Scheduler::Ptr threadDefaultScheduler(std::optional<Scheduler::Ptr> scheduler = std::nullopt) noexcept
 {
-	static thread_local WeakComPtr<Scheduler> threadScheduler__;
+	static thread_local WeakComPtr<Scheduler> threadScheduler;
 
 	if (scheduler)
 	{
-		Assert2(!*scheduler || threadScheduler__.isDead(), Core::Format::format("Thread ({}) already has assigned scheduler", std::this_thread::get_id()));
+		Assert2(!*scheduler || threadScheduler.isDead(), Core::Format::format("Thread ({}) already has assigned scheduler", std::this_thread::get_id()));
 
-		threadScheduler__ = std::move(*scheduler);
+		threadScheduler = std::move(*scheduler);
 	}
 
-	return threadScheduler__.acquire();
+	return threadScheduler.acquire();
 }
 
 
@@ -60,16 +70,20 @@ Scheduler::Ptr defaultScheduler(std::optional<Scheduler::Ptr> scheduler = std::n
 } // namespace
 
 //-----------------------------------------------------------------------------
-Scheduler::InvocationGuard::InvocationGuard(Scheduler& scheduler): threadId(GetCurrentThreadId())
+Scheduler::InvocationGuard::InvocationGuard(Scheduler& scheduler_): threadId(GetCurrentThreadId()), scheduler(scheduler_)
 {
-	Verify2(currentThreadInvokedScheduler(&scheduler) == nullptr, "Thread already has invoked scheduler");
+	currentThreadInvokedScheduler(this);
+
+	//Verify2(currentThreadInvokedScheduler(&scheduler) == nullptr, "Thread already has invoked scheduler");
 }
 
 
 Scheduler::InvocationGuard::~InvocationGuard()
 {
 	Assert2(this->threadId == static_cast<uint64_t>(GetCurrentThreadId()), Core::Format::format("Invalid thread: ({}), scheduler invocation thread: ({})", GetCurrentThreadId(), this->threadId));
-	Verify(currentThreadInvokedScheduler(nullptr) != nullptr);
+
+	currentThreadInvokedScheduler(nullptr);
+	// Verify(currentThreadInvokedScheduler(nullptr) != nullptr);
 }
 
 //-----------------------------------------------------------------------------

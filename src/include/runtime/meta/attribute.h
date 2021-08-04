@@ -66,7 +66,8 @@ inline constexpr bool ClassAttributesDefined = decltype(MetaDetail::classAttribu
 template<typename T,
 	std::enable_if_t<MetaDetail::ClassAttributesDefined<T>, int> = 0>
 decltype(auto) classAttributes() {
-	return typename T::ClassAttributesDefinition::attributes();
+	using ClassAttributesDefinition = typename T::ClassAttributesDefinition;
+	return ClassAttributesDefinition::attributes();
 }
 
 template<typename T,

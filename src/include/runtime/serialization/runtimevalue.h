@@ -295,4 +295,57 @@ struct ABSTRACT_TYPE RuntimeObject : virtual RuntimeReadonlyDictionary
 	virtual boost::optional<FieldInfo> fieldInfo(std::string_view) const  = 0;
 };
 
+
+class ReadonlyDynamicObject
+{
+public:
+
+	ReadonlyDynamicObject(RuntimeValue::Ptr value): _dict(std::move(value))
+	{}
+
+	explicit operator bool () const {
+		return static_cast<bool>(_dict);
+	}
+
+	operator RuntimeValue::Ptr () const {
+		return _dict;
+	}
+
+	bool Has(std::string_view key) const {
+		return _dict && _dict->hasKey(key);
+	}
+
+	template<typename T = RuntimeValue::Ptr>
+	T Get(std::string_view key) const;
+
+	template<>
+	RuntimeValue::Ptr Get<RuntimeValue::Ptr>(std::string_view key) const {
+		Assert(_dict);
+		auto value = _dict->value(key);
+		Assert2(value, Core::Format::format("Named field ({}) does not exists", key));
+		return value;
+	
+	}
+
+	template<>
+	std::string Get<std::string>(std::string_view key) const {
+		const auto value = this->Get<RuntimeValue::Ptr>(key);
+		auto strValue = value->as<const RuntimeStringValue*>();
+		Assert2(strValue, Core::Format::format("Field ({}) is not a string", key));
+
+		return strValue->getUtf8();
+	}
+
+private:
+
+	
+
+	RuntimeReadonlyDictionary::Ptr _dict;
+
+};
+
+
+
 }
+
+

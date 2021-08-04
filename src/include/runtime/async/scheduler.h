@@ -1,3 +1,4 @@
+//◦ Playrix ◦
 #pragma once
 
 #include <runtime/com/comptr.h>
@@ -47,6 +48,8 @@ public:
 		~InvocationGuard();
 
 		const uint64_t threadId;
+		Scheduler& scheduler;
+		InvocationGuard* prev = nullptr;
 	};
 
 	using Callback = void (DEFAULT_CALLBACK *)(void* data1, void* data2) noexcept;
